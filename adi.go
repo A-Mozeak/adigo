@@ -1,25 +1,15 @@
-// An ADI Graph describes a mathematical graph using sets of adjacency descriptive integers.
-// Adjacency descriptive integers are essentially bitsets that have an "on" bit (1) if there is
-// a connection between two nodes and an "off" bit (0) if there isn't. It can be thought of as a
-// compressed adjacency matrix.
-//
-// The benefit of implementing a graph this way is that you can easily perform parallelized operations
-// on the nodes and edges, while avoiding the common overhead of having a large, sparsely-connected matrix.
-// As a simple example, checking whether or not two nodes are connected is an O(1) operation.
+// Package adigo provides an API for building and manipulating compact and fast graphs, using Adjacency Descriptive Integers.
 //
 // ADI Graph
 //
-// This is the wrapper struct that manages the nodes of the graph. The graph is the host of CRUD operations on nodes.
-//
-// Currently, lookup by index is O(1), but lookup by label is O(n). Adding a map to this wrapper,
-// from labels to indices, will allow O(1) lookups by label.
+// This is the wrapper struct that manages the nodes of the graph. The graph is the host of its own CRUD operations.
 //
 // ADI Node
 //
 // The ADI Node is the core of the implementation and provides methods to manage its own contents, labels, and edges.
 //
 // A general-purpose node is provided through Box, but users of the package can implement their own nodes
-// for specialized use-cases by simply implementing the interface.
+// for specialized use-cases by implementing the ADINode interface.
 package adigo
 
 import (
@@ -95,7 +85,7 @@ func (g ADIGraph) lookup(col int, adi byte, offset int, ch chan ADINode, wg *syn
 	wg.Done()
 }
 
-// Connect takes a node in the graph and connects it to any number of other nodes.
+// Connect takes the label of a node in the graph and connects it to any number of other nodes by label.
 func (g ADIGraph) Connect(label string, neighbors ...string) error {
 	item, err := g.GetByLabel(label)
 	if err != nil {
@@ -148,7 +138,6 @@ func (g *ADIGraph) Grow() {
 }
 
 // GetByIndex accepts an integer index and returns the node at that index within the graph.
-// Might be useful to return a pointer to the node.
 func (g ADIGraph) GetByIndex(index int) (ADINode, error) {
 	if index == -1 {
 		return nil, errDeleted
@@ -157,7 +146,6 @@ func (g ADIGraph) GetByIndex(index int) (ADINode, error) {
 }
 
 // GetByLabel accepts a string identifier and returns the node labelled with that identifier.
-// Might be useful to return a pointer to the node.
 func (g ADIGraph) GetByLabel(label string) (ADINode, error) {
 	if index, ok := g.labels[label]; ok {
 		return g.GetByIndex(index)
@@ -191,7 +179,7 @@ func (g ADIGraph) GetLocatorsByLabel(label string) (Locator, error) {
 	return Locator{0, 0}, errLabelNotFound
 }
 
-// DeleteByIndex accepts the integer index of a node within the graph and deletes that node.
+// DeleteByIndex accepts the integer index of a node within the graph and lazy deletes that node.
 //
 // If the index provided is within the graph, a nil error is returned. If it is not in the graph,
 // an errOutOfBounds is returned.
@@ -214,7 +202,7 @@ func (g *ADIGraph) DeleteByIndex(index int) error {
 	return nil
 }
 
-// DeleteByLabel accepts an identifier string and deletes the node labeled with that identifier.
+// DeleteByLabel accepts an identifier string and lazy deletes the node labeled with that identifier.
 //
 // If the label is found, returns a nil error. If not, returns errLabelNotFound.
 func (g *ADIGraph) DeleteByLabel(label string) error {
@@ -225,10 +213,7 @@ func (g *ADIGraph) DeleteByLabel(label string) error {
 	return errLabelNotFound
 }
 
-// BFS from A to B
-//	1. Get node A's ADI, if B is in it, return found.
-//	2. Else append the ADIs of each neighbor to a list.
-//	3. Map isConnected(B) to each node in the list.
+// BFS implements a breadth-first search from node A to node B and returns true if node B is found.
 func (g ADIGraph) BFS(a, b ADINode) bool {
 	// Get the locators for B
 	bLoc, _ := g.GetLocatorsByLabel(b.Label())
@@ -258,70 +243,3 @@ func (g ADIGraph) BFS(a, b ADINode) bool {
 
 	return false
 }
-
-/*
-	The graph should altogether look like:
-		Node	|	ADIs
-		"one"   | [0]: 12, [1]: 34
-		"two"   | [0]: 54, [1]: 96
-
-	The second array of ADIs is only allocated when the amount of Nodes is at capacity.
-
-	Should use slices because the growability is built-in and I'm not trying to reinvent the wheel.
-
-	Growth algorithm:
-		- Array starts with no nodes.
-		- If the length of the array mod the word size == 0, for every node add one more column to the list of ADIs.
-		- Add one to the growth factor.
-
-	Growth Factor:
-		- Measures the amount of times the word size has been passed, and the graph thus grown in both directions.
-		- GF can come in handy when paralellizing operations and also maybe in copying/resizing the graph.
-		- GF == len(nodes % wordSize) == len(ADIs % wordSize) == len(ADIs[0] & wordSize)
-		- GF also helps construct IDs for nodes. If word size == 8, the 9th position will need 2 words to hold its ID, or do (1 << (GF * wordSize) + (node.cardinality % wordSize))
-
-
-	Might be useful to have some counters in the graph.
-*/
-
-/* Synchronous Neighbors behavior.
-// Neighbors accepts a node and returns the neighbors of the node in the graph.
-func (g ADIGraph) Neighbors(n ADINode) []ADINode {
-	var indices []int
-	var results []ADINode
-	gn := g.nodes
-	adis := n.Edges()
-	// For each ADI, calculate the indices.
-	// I can speed this up by parallelizing the check across each possible bit.
-	// Instead of running biterate, I could go Lookup(column, offset).
-	// If s.adis[column]&offset > 0, return gn[column*word_size] + o.
-	// Each goroutine can return an ADINode.
-	for col := 0; col < len(adis); col++ {
-		offs := g.bIterate(adis[col])
-		for _, o := range offs {
-			index := (col * g.wordSize) + o
-			indices = append(indices, index)
-		}
-	}
-
-	for _, i := range indices {
-		results = append(results, gn[i])
-	}
-	// Add the indices to an array.
-	// Read from the graph at those indices.
-
-	return results
-}
-
-// Helper function that gets the individual edges from an ADI.
-func (g ADIGraph) bIterate(b byte) []int {
-	var offs []int
-	for i := byte(0); i < byte(g.wordSize); i++ {
-		check := 1 << i
-		if b&byte(check) != 0 {
-			offs = append(offs, int(i))
-		}
-	}
-	return offs
-}
-*/

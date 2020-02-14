@@ -16,12 +16,18 @@ type ADINode interface {
 	Delete()
 }
 
-// Box is a basic ADI Node that takes any interface as its contents.
+// Box is a basic ADINode that takes any interface as its contents.
 type Box struct {
 	label    string
 	contents interface{}
 	adis     []byte
 	deleted  bool
+}
+
+// NewBox constructs a Box using the given label.
+func NewBox(label string) *Box {
+	newbox := &Box{label, "", []byte{0, 0}, false}
+	return newbox
 }
 
 // Label returns the string identifying a given node.
@@ -63,7 +69,6 @@ func (s *Box) AddEdges(locators ...Locator) {
 }
 
 // RemoveEdges accepts the set of locators from a node and disconnects it from the receiver node.
-// If delete is set to true, shifts the bits over to reference the proper nodes.
 func (s *Box) RemoveEdges(locators ...Locator) {
 	for _, v := range locators {
 		s.adis[v.column] &= ^v.offset
@@ -91,15 +96,12 @@ func (s *Box) HasEdges(strict bool, locators ...Locator) bool {
 	return false
 }
 
-// Deleted returns whether or not the box has been lazy-deleted.
+// Deleted returns whether or not the node has been lazy deleted.
 func (s Box) Deleted() bool {
 	return s.deleted
 }
 
-// Delete removes the node from the graph.
+// Delete flags the node as deleted.
 func (s *Box) Delete() {
 	s.deleted = true
 }
-
-// Could rewrite this so that it only checks for words of length word_size.
-// Then externally call the function for each column.
