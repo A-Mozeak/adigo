@@ -16,7 +16,6 @@ package adigo
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 )
 
@@ -230,10 +229,6 @@ func (g ADIGraph) BFS(a, b ADINode) bool {
 	}
 
 	for len(queue) > 0 {
-		for _, v := range queue {
-			fmt.Printf("%s, ", v.Label())
-		}
-		fmt.Println("")
 		if queue[0].HasEdges(false, bLoc) {
 			return true
 		}
