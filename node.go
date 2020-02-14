@@ -1,4 +1,4 @@
-package main
+package adigo
 
 // ADINode describes the interface that a node should have to be compatible with the graph.
 // See the implementation of Box for descriptions of the interface methods.

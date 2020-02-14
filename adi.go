@@ -20,7 +20,7 @@
 //
 // A general-purpose node is provided through Box, but users of the package can implement their own nodes
 // for specialized use-cases by simply implementing the interface.
-package main
+package adigo
 
 import (
 	"errors"
