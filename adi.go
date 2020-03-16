@@ -1,10 +1,8 @@
 // Package adigo provides an API for building and manipulating compact and fast graphs, using Adjacency Descriptive Integers.
 //
-// (ALPHA RELEASE. NOT INTENDED FOR PRODUCTION USE.)
-//
 // ADI Graph
 //
-// This is the wrapper struct that manages the nodes of the graph. The graph is the host of its own CRUD operations.
+// This is the wrapper struct that manages the nodes of the graph. The graph is the host of its own Create, Read, Update, and Delete operations.
 //
 // ADI Node
 //
